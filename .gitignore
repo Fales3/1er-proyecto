@@ -181,5 +181,6 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
-#Files
+#Nuevos
 OffendES
+test.py

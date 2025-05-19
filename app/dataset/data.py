@@ -5,61 +5,69 @@ import os
 from pathlib import Path
 from typing import Dict, Any
 
-def load_raw_data():
-    """Carga los archivos TSV sin modificar."""
-    return {
-        "train": pd.read_csv("app/OffendES/training_set.tsv", sep="\t"),
-        "dev": pd.read_csv("app/OffendES/dev_set.tsv", sep="\t"),
-        "test": pd.read_csv("app/OffendES/test_set.tsv", sep="\t")
-    }
+def analyze_total():
+    """
+    Función para analizar el total de datos.
+    """
 
-def load_processed_data():
-    """Carga los archivos TSV procesados."""
-    return {
-        "train": pd.read_csv("data/processed/train_processed.csv"),
-        "dev": pd.read_csv("data/processed/dev_processed.csv"),
-        "test": pd.read_csv("data/processed/test_processed.csv")
-    }
-
-def analyze_general(df_dict):
-    """Genera un reporte general de los datos."""
+    # Cargar los datos originales
+    df_dict=load_original_offendes()
+    
+    # Generar un análisis general
     for subset, df in df_dict.items():
         df["subset"] = subset
     
-    analyze_combined_data(df)
-    analyze_distribution(df_dict)
+    save_path = "Análisis general.png"
 
+    stats = {
+        "original": analyze_data(pd.concat(df_dict.values()), "Análisis general.png")
+    }
+    
+    return {"message": "Análisis completado", "Datasets": stats["original"]}
+
+
+def load_original_offendes():
+    """Carga los archivos TSV."""
     return {
-        "message": "Análisis completado",
+        "train": pd.read_csv(os.environ.get("OF_ORIGINAL_PATH") + "training_set.tsv", sep="\t").copy(),
+        "dev": pd.read_csv(os.environ.get("OF_ORIGINAL_PATH") + "dev_set.tsv", sep="\t").copy(),
+        "test": pd.read_csv(os.environ.get("OF_ORIGINAL_PATH") + "test_set.tsv", sep="\t").copy()
     }
 
-def analyze_combined_data(df):
+def load_processed_offendes():
+    """Carga los archivos TSV procesados."""
+    return {
+        "train": pd.read_csv(os.environ.get("OF_PROCESSED_PATH")+"train_processed.csv").copy(),
+        "dev": pd.read_csv(os.environ.get("OF_PROCESSED_PATH")+"dev_processed.csv").copy(),
+        "test": pd.read_csv(os.environ.get("OF_PROCESSED_PATH")+"test_processed.csv").copy()
+    }
 
-    # 2. Distribución de etiquetas
-    print("\nDistribución de etiquetas (%):")
-    print(df["label"].value_counts(normalize=True).mul(100).round(2))
+def analyze_data(df, save_path: str = "img.png"):
+    """Genera un análisis combinado de los datos."""
     
-    # 4. Ejemplos aleatorios globales
-    print("\nEjemplos aleatorios (global):")
+    examples={}
     for label in df["label"].unique():
         sample = df[df["label"] == label].sample(1)
-        print(f"\n- Label '{label}': {sample['comment'].values[0]}")
+        examples[label] = sample['comment'].values[0]
 
-    plot_global_label_distribution(df)
+    plot_data_distribution(df, save_path)
 
     response ={
-        "message": "Análisis combinado completado",
-        "stats": {
-            "Total_de datos: ": len(df),
-            "Distribución de etiquetas: ": df["label"].value_counts(normalize=True).mul(100).round(2).to_dict()
-        }
+        "Total de datos: ": len(df),
+        "Distribución de etiquetas (%): ": df["label"].value_counts(normalize=True).mul(100).round(2).to_dict(),
+        "Ejemplos aleatorios: ": examples,
+        "Gráfico guardado en: ": os.path.join(os.environ.get("IMAGES_PATH", ""), save_path)
     }
     return response
 
-def plot_global_label_distribution(df):
+def plot_data_distribution(df, save_path: str = "img.png"):
     """Grafica la distribución global de etiquetas."""
     plt.figure(figsize=(10, 5))
-    ax = sns.countplot(data=df, x="label", hue="label", order=df["label"].value_counts().index, palette="viridis", legend=False)
+    ax = df["label"].value_counts().sort_values(ascending=False).plot(
+        kind="bar",
+        color=["skyblue", "orange", "green", "red"],
+        legend=False
+    )
     plt.title("Distribución de etiquetado")
     plt.xlabel("Etiqueta")
     plt.ylabel("Cantidad")
@@ -71,10 +79,12 @@ def plot_global_label_distribution(df):
         ax.text(p.get_x() + p.get_width()/2., height + 50,
                 f"{height/total*100:.1f}%", ha="center")
     
-    plt.savefig("global_label_distribution.png")
+    if save_path:
+        Path(os.environ.get("IMAGES_PATH")).mkdir(parents=True, exist_ok=True)
+        plt.savefig(os.environ.get("IMAGES_PATH") + save_path)
     plt.show()
 
-def analyze_distribution(df_dict):
+def analyze_dict_data(df_dict):
     """Genera reporte de distribución"""
 
     report = {
@@ -91,8 +101,7 @@ def analyze_distribution(df_dict):
         report["distribution"][name] = label_dist.to_dict()
     
     plot_path = "label_distribution.png"
-    plot_label_distribution(df_dict, save_path=plot_path)
-    plot_label_distribution(df_dict)
+    plot_datadict_distribution(df_dict, save_path=plot_path)
     report["plots"]["label_distribution"] = plot_path
     
     response ={
@@ -101,20 +110,32 @@ def analyze_distribution(df_dict):
     }
     return response
 
-def plot_label_distribution(df_dict: Dict[str, pd.DataFrame], save_path: str = None):
+def plot_datadict_distribution(df_dict: Dict[str, pd.DataFrame], save_path: str = None):
     """
     Grafica la distribución de etiquetas por subset.
     """
     plt.figure(figsize=(12, 4))
     for i, (name, df) in enumerate(df_dict.items(), 1):
         plt.subplot(1, 3, i)
-        df["label"].value_counts().plot(
+        
+        ax = df["label"].value_counts().plot(
             kind="bar", 
             color=["skyblue", "orange", "green", "red"]
         )
         plt.title(f"Distribución en {name}")
         plt.xlabel("Etiqueta")
-        plt.ylabel("Count")
+        plt.ylabel("Cantidad")
+
+        total = len(df)
+        for p in ax.patches:
+            height = p.get_height()
+            ax.text(
+                p.get_x() + p.get_width() / 2.,
+                height + 5,  # Ajusta este valor para separar el texto de la barra
+                f"{height/total*100:.1f}%",
+                ha="center",
+                fontsize=10
+            )
     
     plt.tight_layout()
     if save_path:

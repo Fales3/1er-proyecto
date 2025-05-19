@@ -1,12 +1,13 @@
 import app.controller.general_controller as controller
 import app.dataset.data as db
 import json
+import app.decorators.exceptions as exceptions
+import app.config.enviroment_set as set_env
 
+@exceptions.manejador_excepciones
 def lambda_handler(event):
-    try:
-        response=controller.general_controller(event)
-
-        return json.dumps(response, ensure_ascii=False, indent=4)
+    set_env.set_environment("./envMDW.json")
     
-    except Exception as e:
-        return json.dumps({"error": str(e)}, ensure_ascii=False, indent=4)
+    response=controller.general_controller(event)
+
+    return json.dumps(response, ensure_ascii=False, indent=4)

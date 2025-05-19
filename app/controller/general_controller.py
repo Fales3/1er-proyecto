@@ -7,9 +7,7 @@ def general_controller(event):
     if action=='Análisis total':
         return data.analyze_total()
     if action=='Preprocesamiento':
-        df_dict=data.load_original_offendes()
-        processed_dict=data.preprocess_data_dict(df_dict, output_dir="data/processed")
-        return processed_dict
+        return data.preprocess_data_dict()
     if action=='Análisis particular':
         df_dict=data.load_processed_offendes()
         return data.analyze_dict_data(df_dict)

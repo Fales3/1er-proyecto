@@ -17,14 +17,16 @@ def analyze_total():
     for subset, df in df_dict.items():
         df["subset"] = subset
     
-    save_path = "Análisis general.png"
+    df_dict_processed=load_processed_offendes()
 
     stats = {
-        "original": analyze_data(pd.concat(df_dict.values()), "Análisis general.png")
+        "Original": analyze_data(pd.concat(df_dict.values()), "Análisis general.png"),
+        "Distribuido": analyze_dict_data(df_dict, "Análisis distribuido.png"),
+        "Procesado": analyze_dict_data(df_dict_processed, "Análisis procesado.png"),
     }
-    
-    return {"message": "Análisis completado", "Datasets": stats["original"]}
 
+    return {"message": "Análisis completado",
+            "Datasets": stats}
 
 def load_original_offendes():
     """Carga los archivos TSV."""
@@ -32,14 +34,6 @@ def load_original_offendes():
         "train": pd.read_csv(os.environ.get("OF_ORIGINAL_PATH") + "training_set.tsv", sep="\t").copy(),
         "dev": pd.read_csv(os.environ.get("OF_ORIGINAL_PATH") + "dev_set.tsv", sep="\t").copy(),
         "test": pd.read_csv(os.environ.get("OF_ORIGINAL_PATH") + "test_set.tsv", sep="\t").copy()
-    }
-
-def load_processed_offendes():
-    """Carga los archivos TSV procesados."""
-    return {
-        "train": pd.read_csv(os.environ.get("OF_PROCESSED_PATH")+"train_processed.csv").copy(),
-        "dev": pd.read_csv(os.environ.get("OF_PROCESSED_PATH")+"dev_processed.csv").copy(),
-        "test": pd.read_csv(os.environ.get("OF_PROCESSED_PATH")+"test_processed.csv").copy()
     }
 
 def analyze_data(df, save_path: str = "img.png"):
@@ -84,33 +78,28 @@ def plot_data_distribution(df, save_path: str = "img.png"):
         plt.savefig(os.environ.get("IMAGES_PATH") + save_path)
     plt.show()
 
-def analyze_dict_data(df_dict):
+def analyze_dict_data(df_dict, save_path: str = "img.png"):
     """Genera reporte de distribución"""
 
-    report = {
-        "total": {},
-        "distribution": {},
-        "plots": {}
+    response = {
+        "Cantidad por subset": {},
+        "Distribución (%)": {},
+        "Gráfico guardado en": {}
     }
 
     for name, df in df_dict.items():
         total = len(df)
-        report["total"][name] = total
+        response["Cantidad por subset"][name] = total
         
         label_dist = df["label"].value_counts(normalize=True).mul(100).round(2)
-        report["distribution"][name] = label_dist.to_dict()
+        response["Distribución (%)"][name] = label_dist.to_dict()
     
-    plot_path = "label_distribution.png"
-    plot_datadict_distribution(df_dict, save_path=plot_path)
-    report["plots"]["label_distribution"] = plot_path
-    
-    response ={
-        "message": "Análisis de Distribución Completado",
-        "reporte": report,
-    }
+    plot_datadict_distribution(df_dict, save_path)
+    response["Gráfico guardado en"]["Análisis Distribuido"] = os.path.join(os.environ.get("IMAGES_PATH", ""), save_path)
+
     return response
 
-def plot_datadict_distribution(df_dict: Dict[str, pd.DataFrame], save_path: str = None):
+def plot_datadict_distribution(df_dict, save_path: str = "img.png"):
     """
     Grafica la distribución de etiquetas por subset.
     """
@@ -139,40 +128,48 @@ def plot_datadict_distribution(df_dict: Dict[str, pd.DataFrame], save_path: str 
     
     plt.tight_layout()
     if save_path:
-        plt.savefig(save_path)
+        Path(os.environ.get("IMAGES_PATH")).mkdir(parents=True, exist_ok=True)
+        plt.savefig(os.environ.get("IMAGES_PATH") + save_path)
     plt.show()
 
-def preprocess_data_dict(df_dict, output_dir="data/processed", force_reprocess=False):
+def load_processed_offendes():
+    """Carga los archivos TSV procesados."""
+    return {
+        "train": pd.read_csv(os.environ.get("OF_PROCESSED_PATH")+"train_processed.csv").copy(),
+        "dev": pd.read_csv(os.environ.get("OF_PROCESSED_PATH")+"dev_processed.csv").copy(),
+        "test": pd.read_csv(os.environ.get("OF_PROCESSED_PATH")+"test_processed.csv").copy()
+    }
+
+
+def preprocess_data_dict():
     "Procesa los datos para clasificación binaria."
     
+    df_dict=load_original_offendes()
+
     offensive_labels={"OFP", "OFG"}
     processed_dict = {}
-    os.makedirs(output_dir, exist_ok=True)
+    Path(os.environ.get("OF_PROCESSED_PATH")).mkdir(parents=True, exist_ok=True)
 
     for subset, df in df_dict.items():
-        output_path = Path(output_dir) / f"{subset}_processed.csv"
+        output_path = Path(os.environ.get("OF_PROCESSED_PATH")) / f"{subset}_processed.csv"
         
-        # Cargar datos procesados si existen y no se fuerza reprocesamiento
-        if not force_reprocess and os.path.exists(output_path):
-            processed_df = pd.read_csv(output_path)
-            print(f"✅ Datos {subset} cargados desde caché: {output_path}")
+        # Cargar datos procesados si existen
+        if os.path.exists(output_path):
+            df = pd.read_csv(output_path)
         else:
             # Procesamiento
-            processed_df = df.copy()
-            processed_df["label"] = processed_df["label"].apply(
+            df["label"] = df["label"].apply(
                 lambda x: 1 if x in offensive_labels else 0
             )
-            processed_df = processed_df[["comment", "label"]]
+            df = df[["comment", "label"]]
             
             # Guardar
-            processed_df.to_csv(output_path, index=False)
-            print(f"✨ Datos {subset} procesados y guardados en: {output_path}")
+            df.to_csv(output_path, index=False)
         
-        processed_dict[subset] = processed_df
+        processed_dict[subset] = df
     
     response={
-        "message": "Preprocesamiento completado",
-        "processed_files": {subset: str(Path(output_dir) / f"{subset}_processed.csv") for subset in df_dict.keys()}
+        "Archivos Procesados": {subset: os.path.join(os.environ.get("OF_PROCESSED_PATH") / f"{subset}_processed.csv") for subset in df_dict.keys()}
     }
 
     return response

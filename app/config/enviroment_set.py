@@ -23,5 +23,6 @@ def set_environment(file=""):
     os.environ["OF_ORIGINAL_PATH"] = credentials["OF_ORIGINAL_PATH"]
     os.environ["OF_PROCESSED_PATH"] = credentials["OF_PROCESSED_PATH"]
     os.environ["IMAGES_PATH"] = credentials["IMAGES_PATH"]
-    os.environ["TOKENIZER_MODEL"] = credentials["TOKENIZER_MODEL"]
+    os.environ["BETO_TOKENIZER"] = credentials["BETO_TOKENIZER"]
+    os.environ["TOKENIZE_PATH"] = credentials["TOKENIZE_PATH"]
     

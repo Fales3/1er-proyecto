@@ -140,7 +140,6 @@ def load_processed_offendes():
         "test": pd.read_csv(os.environ.get("OF_PROCESSED_PATH")+"test_processed.csv").copy()
     }
 
-
 def preprocess_data_dict():
     "Procesa los datos para clasificación binaria."
     

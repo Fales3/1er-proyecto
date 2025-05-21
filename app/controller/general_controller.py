@@ -1,5 +1,6 @@
 import app.dataset.data as data
 import app.decorators.exceptions as exceptions
+import app.transformers.tokenizer as tok
 
 @exceptions.manejador_excepciones
 def general_controller(event):
@@ -11,3 +12,6 @@ def general_controller(event):
     if action=='Análisis particular':
         df_dict=data.load_processed_offendes()
         return data.analyze_dict_data(df_dict)
+    if action=='tokenizar':
+        df_dict=data.load_processed_offendes()
+        return tok.save_tokenized_data(df_dict, 512)

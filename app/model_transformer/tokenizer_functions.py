@@ -1,17 +1,17 @@
-import app.dataset.data as data
 from transformers import AutoTokenizer
 
 import os
 from pathlib import Path
 from datasets import Dataset, DatasetDict
 import numpy as np
+import random
 
 def load_tokenizer():
     """
     Carga el tokenizador desde el modelo preentrenado.
     """
     # Cargar el tokenizador
-    tokenizer = AutoTokenizer.from_pretrained("dccuchile/bert-base-spanish-wwm-cased")
+    tokenizer = AutoTokenizer.from_pretrained(os.environ.get("BETO_TOKENIZER"))
 
     # Verificar si el tokenizador se ha cargado correctamente
     if tokenizer is None:
@@ -28,7 +28,6 @@ def save_tokenized_data(df_dict, max_length=None):
     tokenizer=load_tokenizer()
 
     hf_datasets = DatasetDict()
-    example_data = None
 
     for subset, df in df_dict.items():
         # Tokenizar los comentarios
@@ -48,16 +47,6 @@ def save_tokenized_data(df_dict, max_length=None):
         })
 
         hf_datasets[subset] = hf_dataset
-
-        if subset == "train":
-            example_idx = 0
-            example_data = {
-                "texto_original": df["comment"].iloc[example_idx],
-                "texto_tokenizado": tokenizer.convert_ids_to_tokens(tokenized["input_ids"][example_idx]),
-                "input_ids": tokenized["input_ids"][example_idx].tolist(),
-                "attention_mask": tokenized["attention_mask"][example_idx].tolist(),
-                "etiqueta": int(df["label"].iloc[example_idx])
-            }
     
     tokenize_path = Path(os.environ.get("TOKENIZE_PATH"))
     tokenize_path.mkdir(parents=True, exist_ok=True)
@@ -65,12 +54,41 @@ def save_tokenized_data(df_dict, max_length=None):
 
     return {
         "message": "Tokenización de la data exitosa",
-        "ruta de guardado": str(tokenize_path),
-        "ejemplo": {
-            "texto_original": example_data["texto_original"],
-            "texto_tokenizado": example_data["texto_tokenizado"][:5],
-            "input_ids": example_data["input_ids"][:5],
-            "attention_mask": example_data["attention_mask"][:5],
-            "etiqueta": example_data["etiqueta"]
-        },
+        "ruta de guardado": str(tokenize_path)
     }
+
+def show_tokenized_example(subset="train", idx=None):
+    """
+    Muestra los datos tokenizados.
+    """
+    # Cargar el DatasetDict desde disco
+    tokenize_path = Path(os.environ.get("TOKENIZE_PATH"))
+    hf_datasets = DatasetDict.load_from_disk(tokenize_path)
+
+    dataset = hf_datasets[subset]
+    if idx is None:
+        idx = random.randint(0, len(dataset) - 1)
+
+    example = dataset[idx]
+    tokenizer = load_tokenizer()
+    text = tokenizer.decode(example['input_ids'], skip_special_tokens=True)
+    tokens = tokenizer.convert_ids_to_tokens(example['input_ids'])
+    
+    return {
+        "message": "Ejemplo de dato tokenizado",
+        "índice": idx,
+        "texto decodificado": text,
+        "tokens": tokens[:10],
+        "input ids": example['input_ids'][:5],
+        "attention mask": example['attention_mask'][:5],
+        "etiqueta": example['labels']
+    }
+
+def load_tokenized_data():
+    """
+    Carga el DatasetDict desde disco.
+    """
+    tokenize_path = Path(os.environ.get("TOKENIZE_PATH"))
+    hf_datasets = DatasetDict.load_from_disk(tokenize_path)
+    
+    return hf_datasets

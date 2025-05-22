@@ -1,5 +1,4 @@
 import app.controller.general_controller as controller
-import app.dataset.data as db
 import json
 import app.decorators.exceptions as exceptions
 import app.config.enviroment_set as set_env
